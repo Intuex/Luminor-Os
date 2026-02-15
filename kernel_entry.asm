@@ -14,12 +14,12 @@ section .text
 global _start
 _start:
 
-    ; Map first page table
+
     mov eax, page_table0
     or eax, 3
     mov [page_directory], eax
 
-    ; Fill identity mapping
+
     mov ecx, 0
     mov ebx, 0
 
@@ -33,7 +33,7 @@ _start:
     cmp ecx, 1024
     jne .fill_table
 
-    ; Enable paging
+
     mov eax, page_directory
     mov cr3, eax
 
