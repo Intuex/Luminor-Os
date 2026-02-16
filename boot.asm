@@ -10,7 +10,7 @@ mov bp, 0x8000
 mov sp, bp
 
 mov bx, KERNEL_LOCATION
-mov dh, 2
+mov dh, 20
 
 mov ah, 0x02
 mov al, dh
