@@ -1,6 +1,35 @@
 #include <stdint.h>
 #include "keyboard.h"
 
+struct limine_framebuffer {
+    void* address;
+    uint64_t width, height, pitch;
+    uint16_t bpp;
+    uint8_t memory_model;
+    uint8_t red_mask_size,   red_mask_shift;
+    uint8_t green_mask_size, green_mask_shift;
+    uint8_t blue_mask_size,  blue_mask_shift;
+};
+
+struct limine_framebuffer_response {
+    uint64_t revision;
+    uint64_t count;
+    limine_framebuffer** framebuffers;
+};
+
+struct limine_framebuffer_request {
+    uint64_t id[4];
+    uint64_t revision;
+    limine_framebuffer_response* response;
+};
+
+__attribute__((used, section(".requests")))
+static limine_framebuffer_request fb_request = {
+    { 0xc7b1dd30df4c8b88, 0x0a82e883a194f07b,
+      0x9d5827dcd881dd75, 0xa3148604f6fab11b },
+    0, nullptr
+};
+
 static uint16_t* vga = (uint16_t*)0xB8000;
 
 static int cursor_x = 0;
@@ -76,8 +105,9 @@ extern "C" void run_command(char* cmd)
     print("Unknown command\n");
 }
 
-extern "C" void main()
+extern "C" void _start()
 {
+    clear_screen();
     print("Luminor OS\n");
     print("> ");
 
@@ -104,7 +134,7 @@ extern "C" void main()
         }
         else
         {
-            if (input_pos < sizeof(input) - 1)
+            if (input_pos < (int)sizeof(input) - 1)
             {
                 input[input_pos++] = c;
                 putchar(c);

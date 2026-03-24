@@ -1,32 +1,48 @@
 #!/bin/bash
 set -e
 
-export PATH=$PATH:/usr/local/i386elfgcc/bin
-
+mkdir -p iso/boot/limine
 mkdir -p Binaries
 
-echo "Step:1 Assembling bootloader"
-nasm boot.asm -f bin -o Binaries/boot.bin
+# Clone Limine if not already present
+if [ ! -d "limine" ]; then
+    git clone https://github.com/limine-bootloader/limine.git \
+        --branch=v8.x-binary --depth=1
+fi
 
-echo "Stap:2 Assembling kernel entry"
-nasm kernel_entry.asm -f elf -o Binaries/kernel_entry.o
+echo "Step 1: Compiling kernel"
+x86_64-elf-g++ -ffreestanding -fno-exceptions -fno-rtti \
+    -mcmodel=kernel -mno-red-zone \
+    -c kernel.cpp -o Binaries/kernel.o
 
-echo "step:3 Compiling kernel"
-i386-elf-gcc -ffreestanding -m32 -g -c kernel.cpp -o Binaries/kernel.o
+echo "Step 2: Compiling keyboard"
+x86_64-elf-g++ -ffreestanding -fno-exceptions -fno-rtti \
+    -mcmodel=kernel -mno-red-zone \
+    -c keyboard.cpp -o Binaries/keyboard.o
 
-echo "step4 Compiling malloc"
-i386-elf-gcc -ffreestanding -m32 -g -c malloc.cpp -o Binaries/malloc.o
+echo "Step 3: Compiling malloc"
+x86_64-elf-g++ -ffreestanding -fno-exceptions -fno-rtti \
+    -mcmodel=kernel -mno-red-zone \
+    -c malloc.cpp -o Binaries/malloc.o
 
-echo "step5 Linking kernel"
-i386-elf-ld -o Binaries/full_kernel.bin -Ttext 0x1000 \
-Binaries/kernel_entry.o \
-Binaries/kernel.o \
-Binaries/malloc.o \
---oformat binary
+echo "Step 4: Linking"
+x86_64-elf-ld -T linker.ld \
+    Binaries/kernel.o Binaries/keyboard.o Binaries/malloc.o \
+    -o iso/boot/luminor.elf
 
-echo "step6 Building OS image"
-nasm zeroes.asm -f bin -o Binaries/zeroes.bin
-cat Binaries/boot.bin Binaries/full_kernel.bin Binaries/zeroes.bin > Binaries/OS.bin
+echo "Step 5: Building ISO"
+cp limine/limine-bios.sys limine/limine-bios-cd.bin \
+   limine/limine-uefi-cd.bin iso/boot/limine/
+cp limine.conf iso/boot/limine/
+
+xorriso -as mkisofs \
+    -b boot/limine/limine-bios-cd.bin \
+    -no-emul-boot -boot-load-size 4 -boot-info-table \
+    --efi-boot boot/limine/limine-uefi-cd.bin \
+    -efi-boot-part --efi-boot-image \
+    -o Binaries/luminor.iso iso/
+
+./limine/limine bios-install Binaries/luminor.iso
 
 echo "Running QEMU"
-qemu-system-x86_64 -drive format=raw,file=Binaries/OS.bin,index=0,if=floppy -m 128M
+qemu-system-x86_64 -cdrom Binaries/luminor.iso -m 128M
