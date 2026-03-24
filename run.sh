@@ -2,12 +2,16 @@
 set -e
 
 mkdir -p iso/boot/limine
+mkdir -p iso/EFI/BOOT
 mkdir -p Binaries
 
-# Clone Limine if not already present
 if [ ! -d "limine" ]; then
     git clone https://github.com/limine-bootloader/limine.git \
         --branch=v8.x-binary --depth=1
+fi
+
+if [ ! -f "limine/limine" ]; then
+    make -C limine
 fi
 
 echo "Step 1: Compiling kernel"
@@ -28,12 +32,14 @@ x86_64-elf-g++ -ffreestanding -fno-exceptions -fno-rtti \
 echo "Step 4: Linking"
 x86_64-elf-ld -T linker.ld \
     Binaries/kernel.o Binaries/keyboard.o Binaries/malloc.o \
-    -o iso/boot/luminor.elf
+    -o iso/boot/limine/luminor.elf
 
 echo "Step 5: Building ISO"
-cp limine/limine-bios.sys limine/limine-bios-cd.bin \
-   limine/limine-uefi-cd.bin iso/boot/limine/
-cp limine.conf iso/boot/limine/
+cp limine/limine-bios.sys      iso/boot/limine/
+cp limine/limine-bios-cd.bin   iso/boot/limine/
+cp limine/limine-uefi-cd.bin   iso/boot/limine/
+cp limine/BOOTX64.EFI          iso/EFI/BOOT/
+cp limine.conf                 iso/boot/limine/limine.conf
 
 xorriso -as mkisofs \
     -b boot/limine/limine-bios-cd.bin \
